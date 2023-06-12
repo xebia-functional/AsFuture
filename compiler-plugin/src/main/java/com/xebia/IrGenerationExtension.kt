@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity.WARNING
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
+import org.jetbrains.kotlin.config.JVMConfigurationKeys
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
@@ -48,6 +49,8 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.types.Variance
+import java.util.concurrent.CompletableFuture
+import kotlin.reflect.KClass
 
 internal class IrGenerationExtension(
   private val messageCollector: MessageCollector,
@@ -92,8 +95,8 @@ private class IrVisitor(
         ?: error("Internal error: Function $futureCallableId not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-jdk8.")
 
       val futureClass: IrClassSymbol =
-        pluginContext.referenceClass(ClassId.fromString("java.util.concurrent.CompletableFuture"))
-          ?: error("Internal error: Function $coroutineScope not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-core.")
+        pluginContext.referenceClass(classId<CompletableFuture<*>>())
+          ?: error("Internal error: Function \"java/util/concurrent/CompletableFuture\" not found. Please include the jdk8 module.")
 
       val futureSimpleType = IrSimpleTypeImpl(
         futureClass,
@@ -103,7 +106,7 @@ private class IrVisitor(
       )
 
       val NotImplementedError: IrClassSymbol =
-        pluginContext.referenceClass(ClassId.fromString("kotlin.NotImplementedError")) ?: error("Cannot find TODO")
+        pluginContext.referenceClass(classId<NotImplementedError>()) ?: error("Cannot find TODO")
 
       val newFunction = parent.addFunction("${declaration.name}Future", futureSimpleType.type).apply {
         origin = AsFutureOrigin
@@ -182,4 +185,9 @@ private class IrVisitor(
 //      function = lambda
 //    )
   }
+}
+
+private inline fun <reified T> classId(): ClassId {
+  val fqName = FqName(T::class.java.canonicalName)
+  return ClassId.topLevel(fqName)
 }

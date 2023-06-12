@@ -19,19 +19,24 @@ class CommonComponentRegistrar : CompilerPluginRegistrar() {
     get() = true
 
   override fun ExtensionStorage.registerExtensions(configuration: CompilerConfiguration) {
-    if (configuration[KEY_ENABLED] == false) return
-
-    val messageCollector = configuration.get(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
-    val asFutureAnnotation = ClassId.fromString("sample.AsFuture")
-    val coroutineScope = ClassId.fromString("kotlinx.coroutines.CoroutineScope")
-
-    // TODO implement Fir Checker for annotation
-    //  FirExtensionRegistrarAdapter.registerExtension(FirRedactedExtensionRegistrar(messageCollector))
-
-    IrGenerationExtension.registerExtension(
-      IrGenerationExtension(
-        messageCollector, asFutureAnnotation, coroutineScope
-      )
-    )
+    registerExtensionsCommon(configuration)
   }
+}
+
+@OptIn(ExperimentalCompilerApi::class)
+fun CompilerPluginRegistrar.ExtensionStorage.registerExtensionsCommon(configuration: CompilerConfiguration) {
+  if (configuration[KEY_ENABLED] == false) return
+
+  val messageCollector = configuration.get(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
+  val asFutureAnnotation = ClassId.fromString("sample/AsFuture")
+  val coroutineScope = ClassId.fromString("kotlinx/coroutines/CoroutineScope")
+
+  // TODO implement Fir Checker for annotation
+  //  FirExtensionRegistrarAdapter.registerExtension(FirRedactedExtensionRegistrar(messageCollector))
+
+  IrGenerationExtension.registerExtension(
+    IrGenerationExtension(
+      messageCollector, asFutureAnnotation, coroutineScope
+    )
+  )
 }
