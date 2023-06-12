@@ -8,6 +8,6 @@ class Example(override val coroutineContext: CoroutineContext) : CoroutineScope 
     @AsFuture
     suspend fun myFunction(): Int {
         delay(1000)
-        return 42
+        return 1 //argument.toInt()
     }
 }

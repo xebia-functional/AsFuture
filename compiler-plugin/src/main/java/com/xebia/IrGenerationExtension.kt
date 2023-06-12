@@ -5,9 +5,11 @@ import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.ir.addExtensionReceiver
 import org.jetbrains.kotlin.backend.common.lower.DeclarationIrBuilder
+import org.jetbrains.kotlin.backend.common.lower.irThrow
 import org.jetbrains.kotlin.backend.wasm.ir2wasm.allSuperInterfaces
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageLocationWithRange
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
+import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity.WARNING
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
@@ -18,7 +20,7 @@ import org.jetbrains.kotlin.ir.builders.declarations.addFunction
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
 import org.jetbrains.kotlin.ir.builders.irBlockBody
 import org.jetbrains.kotlin.ir.builders.irCall
-import org.jetbrains.kotlin.ir.builders.irReturn
+import org.jetbrains.kotlin.ir.builders.irCallConstructor
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclaration
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
@@ -27,17 +29,17 @@ import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
-import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
-import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
-import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionExpressionImpl
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
+import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.SimpleTypeNullability
 import org.jetbrains.kotlin.ir.types.impl.IrSimpleTypeImpl
 import org.jetbrains.kotlin.ir.types.impl.makeTypeProjection
-import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.SYNTHETIC_OFFSET
 import org.jetbrains.kotlin.ir.util.classId
+import org.jetbrains.kotlin.ir.util.constructors
+import org.jetbrains.kotlin.ir.util.copyParameterDeclarationsFrom
+import org.jetbrains.kotlin.ir.util.dump
 import org.jetbrains.kotlin.ir.util.file
 import org.jetbrains.kotlin.ir.util.hasAnnotation
 import org.jetbrains.kotlin.name.CallableId
@@ -86,7 +88,7 @@ private class IrVisitor(
 
     if (pluginContext.platform?.isJvm() == true) {
       // This declaration is only available on JVM
-      val futureFn = pluginContext.referenceFunctions(futureCallableId).singleOrNull()
+      val futureFn: IrSimpleFunctionSymbol = pluginContext.referenceFunctions(futureCallableId).singleOrNull()
         ?: error("Internal error: Function $futureCallableId not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-jdk8.")
 
       val futureClass: IrClassSymbol =
@@ -100,35 +102,29 @@ private class IrVisitor(
         emptyList()
       )
 
-      messageCollector.report(
-        CompilerMessageSeverity.WARNING,
-        "(${pluginContext.platform}) ~> ${declaration.name}."
-      )
+      val NotImplementedError: IrClassSymbol =
+        pluginContext.referenceClass(ClassId.fromString("kotlin.NotImplementedError")) ?: error("Cannot find TODO")
 
-      val f: IrSimpleFunction = parent.addFunction {
-        name = Name.identifier("${declaration.name}Future")
+      val newFunction = parent.addFunction("${declaration.name}Future", futureSimpleType.type).apply {
         origin = AsFutureOrigin
-      }.apply {
-//        copyAttributes(declaration as IrAttributeContainer)
-//        copyParameterDeclarationsFrom(declaration)
+        copyParameterDeclarationsFrom(declaration)
 
-        annotations += listOf(/* Add JvmName & Deprecated annotation */)
-//        extensionReceiverParameter = declaration.extensionReceiverParameter?.copyTo(this)
-//        dispatchReceiverParameter = declaration.dispatchReceiverParameter?.copyTo(this)
+        val lambda = irSuspendLambda(declaration, declaration.returnType) { +irCall(declaration) }
+
+        messageCollector.report(WARNING, lambda.dump())
 
         body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
-          val lambda = irSuspendLambda(declaration, declaration.returnType) { +irCall(declaration) }
-          +irReturn(
-            irCall(futureFn).apply {
-              putTypeArgument(0, declaration.returnType)
-//                putValueArgument(0, irGet(parent.thisReceiver!!))
-              putValueArgument(2, lambda)
-            }
-          )
+          +lambda // TODO Fix this fails
+//          val call = irCall(futureFn).apply {
+//            putTypeArgument(0, declaration.returnType)
+//            putValueArgument(2, irCall(lambda))
+//          }
+//          +irReturn(call)
+          +irThrow(irCallConstructor(NotImplementedError.constructors.first(), emptyList()))
         }
-
-        returnType = makeTypeProjection(futureSimpleType.type, Variance.INVARIANT).type
       }
+
+      messageCollector.report(WARNING, newFunction.dump())
     }
     return super.visitFunctionNew(declaration)
   }
@@ -159,7 +155,7 @@ private class IrVisitor(
     parent: IrDeclarationParent,
     returnType: IrType,
     content: IrBlockBodyBuilder.(IrSimpleFunction) -> Unit
-  ): IrFunctionExpression {
+  ): IrSimpleFunction /* IrFunctionExpression */ {
     val scope = IrSimpleTypeImpl(
       coroutineScopeType,
       SimpleTypeNullability.DEFINITELY_NOT_NULL,
@@ -167,8 +163,6 @@ private class IrVisitor(
       emptyList()
     )
     val lambda = pluginContext.irFactory.buildFun {
-      startOffset = SYNTHETIC_OFFSET
-      endOffset = SYNTHETIC_OFFSET
       origin = IrDeclarationOrigin.LOCAL_FUNCTION_FOR_LAMBDA
       name = Name.special("<anonymous>")
       visibility = DescriptorVisibilities.LOCAL
@@ -177,16 +171,15 @@ private class IrVisitor(
     }.apply {
       this.parent = parent
       addExtensionReceiver(scope)
-
-      body = DeclarationIrBuilder(pluginContext, this.symbol, SYNTHETIC_OFFSET, SYNTHETIC_OFFSET)
-        .irBlockBody { content(this@apply) }
+      body = DeclarationIrBuilder(pluginContext, this.symbol).irBlockBody { content(this@apply) }
     }
-    return IrFunctionExpressionImpl(
-      startOffset = SYNTHETIC_OFFSET,
-      endOffset = SYNTHETIC_OFFSET,
-      type = pluginContext.irBuiltIns.suspendFunctionN(0).typeWith(returnType),
-      origin = IrStatementOrigin.LAMBDA,
-      function = lambda
-    )
+    return lambda
+//    return IrFunctionExpressionImpl(
+//      startOffset = UNDEFINED_OFFSET,
+//      endOffset = UNDEFINED_OFFSET,
+//      type = pluginContext.irBuiltIns.suspendFunctionN(1).typeWith(scope, returnType),
+//      origin = IrStatementOrigin.LAMBDA,
+//      function = lambda
+//    )
   }
 }
