@@ -1,5 +1,6 @@
 package com.xebia
 
+import java.util.concurrent.CompletableFuture
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -51,6 +52,7 @@ import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
 import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionExpressionImpl
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
+import org.jetbrains.kotlin.ir.types.SimpleTypeNullability
 import org.jetbrains.kotlin.ir.types.SimpleTypeNullability.DEFINITELY_NOT_NULL
 import org.jetbrains.kotlin.ir.types.addAnnotations
 import org.jetbrains.kotlin.ir.types.typeWith
@@ -80,14 +82,11 @@ private class IrVisitor(
     ?: error("Internal error: Function $coroutineScope not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-core.")
 
   val extensionFnConstructor: IrConstructorSymbol =
-    pluginContext.referenceClass(ClassId.fromString("kotlin/ExtensionFunctionType"))?.constructors?.firstOrNull()
+    pluginContext.referenceClass(classId<ExtensionFunctionType>())?.constructors?.firstOrNull()
       ?: error("Internal error: Class ExtensionFunctionType not found.")
 
   val scopeSimpleType = IrSimpleTypeImpl(
-    coroutineScopeType,
-    DEFINITELY_NOT_NULL,
-    emptyList(),
-    emptyList()
+    coroutineScopeType, DEFINITELY_NOT_NULL, emptyList(), emptyList()
   )
 
   override fun visitFunctionNew(declaration: IrFunction): IrStatement {
@@ -106,15 +105,16 @@ private class IrVisitor(
 
     if (pluginContext.platform?.isJvm() == true) {
       // This declaration is only available on JVM
-      val futureFn: IrSimpleFunctionSymbol = pluginContext.referenceFunctions(futureCallableId).singleOrNull()
-        ?: error("Internal error: Function $futureCallableId not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-jdk8.")
+      val futureFn: IrSimpleFunctionSymbol = pluginContext.referenceFunctions(futureCallableId).singleOrNull() ?: error(
+        "Internal error: Function $futureCallableId not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-jdk8."
+      )
 
-      val futureClass: IrClassSymbol =
-        pluginContext.referenceClass(ClassId.fromString("java.util.concurrent.CompletableFuture"))
-          ?: error("Internal error: Function $coroutineScope not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-core.")
+      val futureClass: IrClassSymbol = pluginContext.referenceClass(classId<CompletableFuture<*>>())
+        ?: error("Internal error: Function \"java/util/concurrent/CompletableFuture\" not found. Please include the jdk8 module.")
 
       val futureSimpleType = IrSimpleTypeImpl(
-        futureClass, DEFINITELY_NOT_NULL,
+        futureClass,
+        DEFINITELY_NOT_NULL,
         listOf(makeTypeProjection(declaration.returnType, Variance.INVARIANT)),
         emptyList()
       )
@@ -139,11 +139,9 @@ private class IrVisitor(
             putTypeArgument(0, declaration.returnType)
             // value argument 0, 1 have default values we want to maintain.
             putValueArgument(
-              2,
-              lambdaArgument(
+              2, lambdaArgument(
                 lambda,
-                pluginContext.irBuiltIns.suspendFunctionN(1)
-                  .typeWith(scopeSimpleType, declaration.returnType)
+                pluginContext.irBuiltIns.suspendFunctionN(1).typeWith(scopeSimpleType, declaration.returnType)
                   .addAnnotations(listOf(irCall(extensionFnConstructor)))
               )
             )
@@ -163,11 +161,9 @@ private class IrVisitor(
 
   /** Finds the line and column of [irElement] within this file. */
   private fun IrFile.locationOf(irElement: IrElement?): CompilerMessageSourceLocation {
-    val sourceRangeInfo =
-      fileEntry.getSourceRangeInfo(
-        beginOffset = irElement?.startOffset ?: SYNTHETIC_OFFSET,
-        endOffset = irElement?.endOffset ?: SYNTHETIC_OFFSET
-      )
+    val sourceRangeInfo = fileEntry.getSourceRangeInfo(
+      beginOffset = irElement?.startOffset ?: SYNTHETIC_OFFSET, endOffset = irElement?.endOffset ?: SYNTHETIC_OFFSET
+    )
     return CompilerMessageLocationWithRange.create(
       path = sourceRangeInfo.filePath,
       lineStart = sourceRangeInfo.startLineNumber + 1,
@@ -179,8 +175,7 @@ private class IrVisitor(
   }
 
   fun IrBuilderWithScope.buildSuspendLambda(
-    returnType: IrType,
-    funApply: IrSimpleFunction.() -> Unit
+    returnType: IrType, funApply: IrSimpleFunction.() -> Unit
   ): IrSimpleFunction = pluginContext.irFactory.buildFun {
     name = Name.special("<anonymous>")
     this.returnType = returnType
@@ -201,10 +196,11 @@ private class IrVisitor(
   }
 
   fun lambdaArgument(lambda: IrSimpleFunction, type: IrType): IrFunctionExpression = IrFunctionExpressionImpl(
-    UNDEFINED_OFFSET,
-    UNDEFINED_OFFSET,
-    type,
-    lambda,
-    IrStatementOrigin.LAMBDA
+    UNDEFINED_OFFSET, UNDEFINED_OFFSET, type, lambda, IrStatementOrigin.LAMBDA
   )
+}
+
+private inline fun <reified T> classId(): ClassId {
+  val fqName = FqName(T::class.java.canonicalName)
+  return ClassId.topLevel(fqName)
 }
