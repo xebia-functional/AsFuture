@@ -18,7 +18,7 @@ allprojects {
 
 group = "com.xebia"
 version = "0.0.1"
-val autoService = "1.0.1"
+val autoService = "1.1.1"
 
 dependencies {
   compileOnly("com.google.auto.service:auto-service:$autoService")
