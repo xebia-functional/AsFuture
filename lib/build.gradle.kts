@@ -20,5 +20,10 @@ kotlin {
         api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
       }
     }
+    val jvmMain by getting {
+      dependencies {
+        api("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.7.1")
+      }
+    }
   }
 }
