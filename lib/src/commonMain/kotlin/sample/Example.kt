@@ -10,8 +10,8 @@ class Example @JvmOverloads constructor(
     override val coroutineContext: CoroutineContext = Dispatchers.Default
 ) : CoroutineScope{
     @AsFuture
-    suspend fun myFunction(): Int {
+    suspend fun <A> myFunction(argument: A): String {
         delay(1000)
-        return 1 //argument.toInt()
+        return argument.toString()
     }
 }

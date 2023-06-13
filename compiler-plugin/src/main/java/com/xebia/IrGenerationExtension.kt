@@ -40,19 +40,29 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.backend.common.descriptors.synthesizedName
+import org.jetbrains.kotlin.backend.common.lower.irThrow
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.builders.IrBuilderWithScope
+import org.jetbrains.kotlin.ir.builders.declarations.IrTypeParameterBuilder
 import org.jetbrains.kotlin.ir.builders.declarations.IrValueParameterBuilder
 import org.jetbrains.kotlin.ir.builders.declarations.buildValueParameter
+import org.jetbrains.kotlin.ir.builders.irCallConstructor
 import org.jetbrains.kotlin.ir.builders.irGet
 import org.jetbrains.kotlin.ir.builders.irReturn
 import org.jetbrains.kotlin.ir.builders.parent
+import org.jetbrains.kotlin.ir.declarations.IrAttributeContainer
+import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
+import org.jetbrains.kotlin.ir.declarations.IrValueParameter
+import org.jetbrains.kotlin.ir.declarations.copyAttributes
 import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
 import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionExpressionImpl
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
+import org.jetbrains.kotlin.ir.types.SimpleTypeNullability
 import org.jetbrains.kotlin.ir.types.SimpleTypeNullability.DEFINITELY_NOT_NULL
 import org.jetbrains.kotlin.ir.types.addAnnotations
+import org.jetbrains.kotlin.ir.types.classFqName
+import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.patchDeclarationParents
 
@@ -119,8 +129,13 @@ private class IrVisitor(
         emptyList()
       )
 
+      val NotImplementedError: IrClassSymbol =
+        pluginContext.referenceClass(ClassId.fromString("kotlin.NotImplementedError")) ?: error("Cannot find TODO")
+
       parent.addFunction("${declaration.name}Future", futureSimpleType.type).apply {
+        val thisScope = this
         origin = AsFutureOrigin
+        copyAttributes(declaration as IrAttributeContainer)
         copyParameterDeclarationsFrom(declaration)
         val `this` = this.dispatchReceiverParameter!!
 
@@ -129,6 +144,12 @@ private class IrVisitor(
             body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
               +irReturn(irCall(declaration).apply {
                 this.dispatchReceiver = irGet(`this`)
+                thisScope.typeParameters.withIndex().forEach { (index, type) ->
+                  putTypeArgument(index, type.defaultType)
+                }
+                thisScope.valueParameters.withIndex().forEach { (index, parameter) ->
+                  putValueArgument(index, irGet(parameter))
+                }
               })
             }
           }
@@ -136,6 +157,7 @@ private class IrVisitor(
           val call = irCall(futureFn).apply {
             type = futureSimpleType.type
             this.extensionReceiver = irGet(`this`)
+
             putTypeArgument(0, declaration.returnType)
             // value argument 0, 1 have default values we want to maintain.
             putValueArgument(
@@ -150,6 +172,7 @@ private class IrVisitor(
           }
 
           +irReturn(call)
+//          +irThrow(irCallConstructor(NotImplementedError.constructors.first(), emptyList()))
         }
       }
     }
