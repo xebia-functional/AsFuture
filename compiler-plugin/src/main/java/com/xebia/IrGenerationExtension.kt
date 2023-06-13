@@ -39,7 +39,6 @@ import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.types.Variance
-import java.util.concurrent.CompletableFuture
 import org.jetbrains.kotlin.backend.common.descriptors.synthesizedName
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.builders.IrBuilderWithScope
@@ -111,8 +110,8 @@ private class IrVisitor(
         ?: error("Internal error: Function $futureCallableId not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-jdk8.")
 
       val futureClass: IrClassSymbol =
-        pluginContext.referenceClass(classId<CompletableFuture<*>>())
-          ?: error("Internal error: Function \"java/util/concurrent/CompletableFuture\" not found. Please include the jdk8 module.")
+        pluginContext.referenceClass(ClassId.fromString("java.util.concurrent.CompletableFuture"))
+          ?: error("Internal error: Function $coroutineScope not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-core.")
 
       val futureSimpleType = IrSimpleTypeImpl(
         futureClass, DEFINITELY_NOT_NULL,
@@ -120,7 +119,7 @@ private class IrVisitor(
         emptyList()
       )
 
-      parent.addFunction("${declaration.name}Future", futureSimpleType.type).apply parent@{
+      parent.addFunction("${declaration.name}Future", futureSimpleType.type).apply {
         origin = AsFutureOrigin
         copyParameterDeclarationsFrom(declaration)
         val `this` = this.dispatchReceiverParameter!!
@@ -208,9 +207,4 @@ private class IrVisitor(
     lambda,
     IrStatementOrigin.LAMBDA
   )
-}
-
-private inline fun <reified T> classId(): ClassId {
-  val fqName = FqName(T::class.java.canonicalName)
-  return ClassId.topLevel(fqName)
 }
