@@ -12,7 +12,6 @@ import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity.WARNING
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
-import org.jetbrains.kotlin.config.JVMConfigurationKeys
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.ir.IrElement
 import org.jetbrains.kotlin.ir.IrStatement
@@ -50,7 +49,30 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.types.Variance
 import java.util.concurrent.CompletableFuture
-import kotlin.reflect.KClass
+import org.jetbrains.kotlin.backend.common.descriptors.synthesizedName
+import org.jetbrains.kotlin.builtins.StandardNames
+import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
+import org.jetbrains.kotlin.ir.builders.IrBuilderWithScope
+import org.jetbrains.kotlin.ir.builders.declarations.IrFunctionBuilder
+import org.jetbrains.kotlin.ir.builders.declarations.IrValueParameterBuilder
+import org.jetbrains.kotlin.ir.builders.declarations.buildValueParameter
+import org.jetbrains.kotlin.ir.builders.irGet
+import org.jetbrains.kotlin.ir.builders.irReturn
+import org.jetbrains.kotlin.ir.builders.parent
+import org.jetbrains.kotlin.ir.expressions.IrBlockBody
+import org.jetbrains.kotlin.ir.expressions.IrExpressionBody
+import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
+import org.jetbrains.kotlin.ir.expressions.IrReturn
+import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
+import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionExpressionImpl
+import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
+import org.jetbrains.kotlin.ir.types.addAnnotations
+import org.jetbrains.kotlin.ir.types.typeWith
+import org.jetbrains.kotlin.ir.util.allParameters
+import org.jetbrains.kotlin.ir.util.dumpKotlinLike
+import org.jetbrains.kotlin.ir.util.patchDeclarationParents
+import org.jetbrains.kotlin.utils.addToStdlib.UnsafeCastFunction
+import org.jetbrains.kotlin.utils.addToStdlib.cast
 
 internal class IrGenerationExtension(
   private val messageCollector: MessageCollector,
@@ -74,6 +96,24 @@ private class IrVisitor(
   val futureCallableId = CallableId(FqName("kotlinx.coroutines.future"), Name.identifier("future"))
   val coroutineScopeType: IrClassSymbol = pluginContext.referenceClass(coroutineScope)
     ?: error("Internal error: Function $coroutineScope not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-core.")
+
+  val extensionFnConstr: IrConstructorSymbol =
+    pluginContext.referenceClass(ClassId.fromString("kotlin/ExtensionFunctionType"))?.constructors?.firstOrNull()
+      ?: error("Internal error: Class ExtensionFunctionType not found.")
+
+  val scopeSimpleType = IrSimpleTypeImpl(
+    coroutineScopeType,
+    SimpleTypeNullability.DEFINITELY_NOT_NULL,
+    emptyList(),
+    emptyList()
+  )
+
+//  override fun visitClassNew(declaration: IrClass): IrStatement {
+//    if (declaration.name.asString().contains("Example2")) {
+//      messageCollector.report(ERROR, declaration.dump())
+//    }
+//    return super.visitClassNew(declaration)
+//  }
 
   override fun visitFunctionNew(declaration: IrFunction): IrStatement {
     if (!declaration.hasAnnotation(annotationClassId.asSingleFqName())) return super.visitFunctionNew(declaration)
@@ -105,25 +145,67 @@ private class IrVisitor(
         emptyList()
       )
 
+      messageCollector.report(
+        WARNING,
+        futureSimpleType.type.dumpKotlinLike()
+      )
+
       val NotImplementedError: IrClassSymbol =
         pluginContext.referenceClass(classId<NotImplementedError>()) ?: error("Cannot find TODO")
 
       val newFunction = parent.addFunction("${declaration.name}Future", futureSimpleType.type).apply {
         origin = AsFutureOrigin
         copyParameterDeclarationsFrom(declaration)
+        val parentDispatch = this.dispatchReceiverParameter
 
-        val lambda = irSuspendLambda(declaration, declaration.returnType) { +irCall(declaration) }
-
-        messageCollector.report(WARNING, lambda.dump())
+//        val lambda = irSuspendLambda(declaration, declaration.returnType) { +irCall(declaration) }
 
         body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
-          +lambda // TODO Fix this fails
+          val lambda = buildLambda(declaration.returnType) {
+//            this.extensionReceiverParameter = parentDispatch!!
+            body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
+              +irReturn(irCall(declaration).apply {
+                this.dispatchReceiver = irGet(parentDispatch!!)
+              })
+            }
+          }
+
+
+          val call = irCall(futureFn).apply {
+            type = futureSimpleType.type
+            this.extensionReceiver = irGet(parentDispatch!!)
+            putTypeArgument(0, declaration.returnType)
+            putValueArgument(
+              2,
+              lambdaArgument(
+                lambda,
+                pluginContext.irBuiltIns.suspendFunctionN(1)
+                  .typeWith(scopeSimpleType, declaration.returnType)
+                  .addAnnotations(listOf(irCall(extensionFnConstr)))
+              )
+            )
+          }
+
+          messageCollector.report(WARNING, call.dump())
+//          val lambda = buildLambda(declaration.returnType) {
+//            body = DeclarationIrBuilder(pluginContext,symbol).irBlockBody {
+//              +irReturn(irCall(declaration))
+//            }
+//          }
+//          +irReturn(irCall(futureFn).apply {
+//            putTypeArgument(0, declaration.returnType)
+//            putValueArgument(2, lambdaArgument(lambda))
+//          })
+//          messageCollector.report(ERROR, lambda.dump())
+//          +lambda
+//          messageCollector.report(WARNING, lambda.dump())
+//          +lambda // TODO Fix this fails
 //          val call = irCall(futureFn).apply {
 //            putTypeArgument(0, declaration.returnType)
 //            putValueArgument(2, irCall(lambda))
 //          }
-//          +irReturn(call)
-          +irThrow(irCallConstructor(NotImplementedError.constructors.first(), emptyList()))
+          +irReturn(call)
+//          +irThrow(irCallConstructor(NotImplementedError.constructors.first(), emptyList()))
         }
       }
 
@@ -185,6 +267,71 @@ private class IrVisitor(
 //      function = lambda
 //    )
   }
+
+  @OptIn(UnsafeCastFunction::class)
+  public fun IrBuilderWithScope.buildLambda(
+    returnType: IrType,
+    funBuilder: IrFunctionBuilder.() -> Unit = {},
+    funApply: IrSimpleFunction.() -> Unit
+  ): IrSimpleFunction = pluginContext.irFactory.buildFun {
+    name = Name.special("<anonymous>")
+    this.returnType = returnType
+    this.origin = IrDeclarationOrigin.LOCAL_FUNCTION_FOR_LAMBDA
+    this.visibility = DescriptorVisibilities.LOCAL
+    isSuspend = true
+    funBuilder()
+  }.apply {
+//    annotations += irCall(extensionFnConstr)
+    IrValueParameterBuilder().run {
+      this.type = scopeSimpleType
+      this.origin = IrDeclarationOrigin.DEFINED
+      this.index = -1
+      this.name = "this\$future".synthesizedName
+      factory.buildValueParameter(this, this@apply).also { receiver ->
+        extensionReceiverParameter = receiver
+      }
+    }
+    this.patchDeclarationParents(this@buildLambda.parent)
+    funApply()
+
+    val returnTypeSet = try {
+      this.returnType
+      true
+    } catch (e: Throwable) {
+      false
+    }
+
+    val body = this.body
+    if (!returnTypeSet && body is IrExpressionBody) {
+      this.returnType = body.expression.type
+    }
+    if (!returnTypeSet && body is IrBlockBody && body.statements.size == 1 && body.statements[0] is IrReturn && body.statements[0].cast<IrReturn>().returnTargetSymbol == this.symbol) {
+      this.returnType = body.statements[0].cast<IrReturn>().value.type
+    }
+  }
+
+  public fun lambdaArgument(
+    lambda: IrSimpleFunction,
+    type: IrType = run {
+      //TODO workaround for https://youtrack.jetbrains.com/issue/KT-46896
+      val base = if (lambda.isSuspend)
+        pluginContext.referenceClass(StandardNames.getSuspendFunctionClassId(lambda.allParameters.size))
+          ?: error("suspend function type not found")
+      else
+        pluginContext.referenceClass(StandardNames.getFunctionClassId(lambda.allParameters.size))
+          ?: error("function type not found")
+
+      base.typeWith(lambda.allParameters.map { it.type } + lambda.returnType)
+    },
+    startOffset: Int = UNDEFINED_OFFSET,
+    endOffset: Int = UNDEFINED_OFFSET
+  ): IrFunctionExpression = IrFunctionExpressionImpl(
+    startOffset,
+    endOffset,
+    type,
+    lambda,
+    IrStatementOrigin.LAMBDA
+  )
 }
 
 private inline fun <reified T> classId(): ClassId {
