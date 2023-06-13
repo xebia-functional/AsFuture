@@ -5,5 +5,5 @@ includeBuild("gradle-plugin") {
 }
 includeBuild("compiler-plugin")
 
-include(":lib")
 include(":annotation")
+include(":lib")
