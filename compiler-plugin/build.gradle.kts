@@ -18,7 +18,7 @@ allprojects {
 
 group = "com.xebia"
 version = "0.0.1"
-val autoService = "1.0.1"
+val autoService = "1.1.1"
 
 sourceSets {
   test {
