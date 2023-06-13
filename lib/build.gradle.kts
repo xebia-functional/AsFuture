@@ -16,7 +16,7 @@ kotlin {
   sourceSets {
     val commonMain by getting {
       dependencies {
-        compileOnly(project(":annotation"))
+        implementation(project(":annotation"))
         api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
       }
     }
