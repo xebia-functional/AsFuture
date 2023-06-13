@@ -24,6 +24,7 @@ FILE fqName:com.xebia.test fileName:/simple.kt
     FUN name:myFunction visibility:public modality:FINAL <> ($this:com.xebia.test.Example) returnType:kotlin.Int [suspend]
       annotations:
         AsFuture
+        JvmName(name = 'myFunctionSuspend')
       $this: VALUE_PARAMETER name:<this> type:com.xebia.test.Example
       BLOCK_BODY
         CALL 'public final fun delay (timeMillis: kotlin.Long): kotlin.Unit [suspend] declared in kotlinx.coroutines.DelayKt' type=kotlin.Unit origin=null
@@ -44,14 +45,22 @@ FILE fqName:com.xebia.test fileName:/simple.kt
         public open fun toString (): kotlin.String [fake_override] declared in kotlinx.coroutines.CoroutineScope
       $this: VALUE_PARAMETER name:<this> type:kotlin.Any
     FUN GENERATED_AS_FUTURE_CLASS_MEMBER name:myFunctionFuture visibility:public modality:FINAL <> ($this:com.xebia.test.Example) returnType:java.util.concurrent.CompletableFuture<kotlin.Int>
+      annotations:
+        JvmName(name = 'myFunction')
+        Deprecated(message = 'This function should not be called from Kotlin sources, only Java APIs.', replaceWith = <null>, level = GET_ENUM 'ENUM_ENTRY IR_EXTERNAL_DECLARATION_STUB name:HIDDEN' type=kotlin.DeprecationLevel)
       $this: VALUE_PARAMETER name:<this> type:com.xebia.test.Example
       BLOCK_BODY
-        FUN LOCAL_FUNCTION_FOR_LAMBDA name:<anonymous> visibility:local modality:FINAL <> ($receiver:kotlinx.coroutines.CoroutineScope) returnType:kotlin.Int [suspend]
-          $receiver: VALUE_PARAMETER name:$receiver type:kotlinx.coroutines.CoroutineScope
-          BLOCK_BODY
-            CALL 'public final fun myFunction (): kotlin.Int [suspend] declared in com.xebia.test.Example' type=kotlin.Int origin=null
-        THROW type=kotlin.Nothing
-          CONSTRUCTOR_CALL 'public constructor <init> (message: kotlin.String) [primary] declared in kotlin.NotImplementedError' type=kotlin.NotImplementedError origin=null
+        RETURN type=kotlin.Nothing from='public final fun myFunctionFuture (): java.util.concurrent.CompletableFuture<kotlin.Int> declared in com.xebia.test.Example'
+          CALL 'public final fun future <T> (context: kotlin.coroutines.CoroutineContext, start: kotlinx.coroutines.CoroutineStart, block: @[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, T of kotlinx.coroutines.future.FutureKt.future>): java.util.concurrent.CompletableFuture<T of kotlinx.coroutines.future.FutureKt.future> declared in kotlinx.coroutines.future.FutureKt' type=java.util.concurrent.CompletableFuture<kotlin.Int> origin=null
+            <T>: kotlin.Int
+            $receiver: GET_VAR '<this>: com.xebia.test.Example declared in com.xebia.test.Example.myFunctionFuture' type=com.xebia.test.Example origin=null
+            block: FUN_EXPR type=@[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, kotlin.Int> origin=LAMBDA
+              FUN LOCAL_FUNCTION_FOR_LAMBDA name:<anonymous> visibility:public modality:FINAL <> ($receiver:kotlinx.coroutines.CoroutineScope) returnType:kotlin.Int [suspend]
+                $receiver: VALUE_PARAMETER name:$this$future type:kotlinx.coroutines.CoroutineScope
+                BLOCK_BODY
+                  RETURN type=kotlin.Nothing from='public final fun <anonymous> (): kotlin.Int [suspend] declared in com.xebia.test.Example.myFunctionFuture'
+                    CALL 'public final fun myFunction (): kotlin.Int [suspend] declared in com.xebia.test.Example' type=kotlin.Int origin=null
+                      $this: GET_VAR '<this>: com.xebia.test.Example declared in com.xebia.test.Example.myFunctionFuture' type=com.xebia.test.Example origin=null
   FUN name:box visibility:public modality:FINAL <> () returnType:kotlin.String
     BLOCK_BODY
       RETURN type=kotlin.Nothing from='public final fun box (): kotlin.String declared in com.xebia.test'

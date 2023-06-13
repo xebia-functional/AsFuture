@@ -4,5 +4,5 @@ import sample.Example
 import kotlin.coroutines.EmptyCoroutineContext
 
 suspend fun main() {
-  Example(EmptyCoroutineContext).myFunction()
+  Example(EmptyCoroutineContext).myFunction(1)
 }
