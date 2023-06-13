@@ -1,8 +1,12 @@
 plugins {
   id("org.jetbrains.kotlin.multiplatform") version "1.8.20"
+  `maven-publish`
 }
 
 apply(plugin = "compiler.gradleplugin.asfuture")
+
+group = "com.xebia"
+version = "0.0.1"
 
 configure<com.xebia.gradle.TestCompilerExtension> {
   enabled = true
