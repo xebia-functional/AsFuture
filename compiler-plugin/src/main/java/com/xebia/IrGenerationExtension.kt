@@ -1,5 +1,6 @@
 package com.xebia
 
+import java.util.concurrent.CompletableFuture
 import org.jetbrains.kotlin.backend.common.IrElementTransformerVoidWithContext
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -40,39 +41,28 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.backend.common.descriptors.synthesizedName
-import org.jetbrains.kotlin.backend.common.lower.irThrow
-import org.jetbrains.kotlin.fir.declarations.builder.buildEnumEntry
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.builders.IrBuilderWithScope
-import org.jetbrains.kotlin.ir.builders.declarations.IrTypeParameterBuilder
 import org.jetbrains.kotlin.ir.builders.declarations.IrValueParameterBuilder
 import org.jetbrains.kotlin.ir.builders.declarations.buildValueParameter
-import org.jetbrains.kotlin.ir.builders.irCallConstructor
 import org.jetbrains.kotlin.ir.builders.irGet
 import org.jetbrains.kotlin.ir.builders.irReturn
 import org.jetbrains.kotlin.ir.builders.parent
 import org.jetbrains.kotlin.ir.declarations.IrAttributeContainer
 import org.jetbrains.kotlin.ir.declarations.IrEnumEntry
-import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
-import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.declarations.copyAttributes
-import org.jetbrains.kotlin.ir.declarations.impl.IrEnumEntryImpl
-import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionExpressionImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrGetEnumValueImpl
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.impl.IrEnumEntrySymbolImpl
-import org.jetbrains.kotlin.ir.types.SimpleTypeNullability
 import org.jetbrains.kotlin.ir.types.SimpleTypeNullability.DEFINITELY_NOT_NULL
 import org.jetbrains.kotlin.ir.types.addAnnotations
-import org.jetbrains.kotlin.ir.types.classFqName
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.typeWith
-import org.jetbrains.kotlin.ir.util.irCall
-import org.jetbrains.kotlin.ir.util.irConstructorCall
 import org.jetbrains.kotlin.ir.util.patchDeclarationParents
 
 internal class IrGenerationExtension(
@@ -99,19 +89,40 @@ private class IrVisitor(
     ?: error("Internal error: Function $coroutineScope not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-core.")
 
   val extensionFnConstructor: IrConstructorSymbol =
-    pluginContext.referenceClass(ClassId.fromString("kotlin/ExtensionFunctionType"))?.constructors?.firstOrNull()
+    pluginContext.referenceClass(classId<ExtensionFunctionType>())?.constructors?.firstOrNull()
       ?: error("Internal error: Class ExtensionFunctionType not found.")
 
   val jvmNameConstructor: IrConstructorSymbol =
     pluginContext.referenceClass(ClassId.fromString("kotlin/jvm/JvmName"))?.constructors?.firstOrNull()
       ?: error("Internal error: Class ExtensionFunctionType not found.")
 
+  val deprecatedConstructor: IrConstructorSymbol =
+    pluginContext.referenceClass(ClassId.fromString("kotlin/Deprecated"))?.constructors?.firstOrNull()
+      ?: error("Internal error: Class ExtensionFunctionType not found.")
+
   val scopeSimpleType = IrSimpleTypeImpl(
-    coroutineScopeType,
+    coroutineScopeType, DEFINITELY_NOT_NULL, emptyList(), emptyList()
+  )
+
+  val deprecationLevelType: IrClassSymbol = pluginContext.referenceClass(classId<DeprecationLevel>())
+    ?: error("Internal error:DeprecationLevel not found.")
+
+  val deprecationLevelIrType = IrSimpleTypeImpl(
+    deprecationLevelType,
     DEFINITELY_NOT_NULL,
     emptyList(),
     emptyList()
   )
+
+  val HIDDEN: IrEnumEntry = pluginContext.irFactory.createEnumEntry(
+    UNDEFINED_OFFSET,
+    UNDEFINED_OFFSET,
+    IrDeclarationOrigin.IR_EXTERNAL_DECLARATION_STUB,
+    IrEnumEntrySymbolImpl(),
+    Name.identifier("HIDDEN")
+  ).apply {
+    parent = deprecationLevelType.owner
+  }
 
   override fun visitFunctionNew(declaration: IrFunction): IrStatement {
     if (!declaration.hasAnnotation(annotationClassId.asSingleFqName())) return super.visitFunctionNew(declaration)
@@ -131,15 +142,16 @@ private class IrVisitor(
 
     if (pluginContext.platform?.isJvm() == true) {
       // This declaration is only available on JVM
-      val futureFn: IrSimpleFunctionSymbol = pluginContext.referenceFunctions(futureCallableId).singleOrNull()
-        ?: error("Internal error: Function $futureCallableId not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-jdk8.")
+      val futureFn: IrSimpleFunctionSymbol = pluginContext.referenceFunctions(futureCallableId).singleOrNull() ?: error(
+        "Internal error: Function $futureCallableId not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-jdk8."
+      )
 
-      val futureClass: IrClassSymbol =
-        pluginContext.referenceClass(ClassId.fromString("java.util.concurrent.CompletableFuture"))
-          ?: error("Internal error: Function $coroutineScope not found. Please include org.jetbrains.kotlinx:kotlinx-coroutines-core.")
+      val futureClass: IrClassSymbol = pluginContext.referenceClass(classId<CompletableFuture<*>>())
+        ?: error("Internal error: Function \"java/util/concurrent/CompletableFuture\" not found. Please include the jdk8 module.")
 
       val futureSimpleType = IrSimpleTypeImpl(
-        futureClass, DEFINITELY_NOT_NULL,
+        futureClass,
+        DEFINITELY_NOT_NULL,
         listOf(makeTypeProjection(declaration.returnType, Variance.INVARIANT)),
         emptyList()
       )
@@ -151,7 +163,29 @@ private class IrVisitor(
         copyParameterDeclarationsFrom(declaration)
         val `this` = this.dispatchReceiverParameter!!
 
-        annotations += listOf(jvmNameAnnotation("${declaration.name}"))
+        annotations += listOf(
+          jvmNameAnnotation("${declaration.name}"),
+          IrConstructorCallImpl.fromSymbolOwner(
+            deprecatedConstructor.owner.returnType,
+            deprecatedConstructor
+          ).apply {
+            putValueArgument(
+              0,
+              IrConstImpl.string(
+                UNDEFINED_OFFSET,
+                UNDEFINED_OFFSET,
+                pluginContext.irBuiltIns.stringType,
+                "This function should not be called from Kotlin sources, only Java APIs."
+              )
+            )
+            putValueArgument(
+              2,
+              IrGetEnumValueImpl(
+                UNDEFINED_OFFSET, UNDEFINED_OFFSET, deprecationLevelIrType, HIDDEN.symbol
+              )
+            )
+          }
+        )
 
         body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
           val lambda = buildSuspendLambda(declaration.returnType) {
@@ -176,11 +210,9 @@ private class IrVisitor(
             putTypeArgument(0, declaration.returnType)
             // value argument 0, 1 have default values we want to maintain.
             putValueArgument(
-              2,
-              lambdaArgument(
+              2, lambdaArgument(
                 lambda,
-                pluginContext.irBuiltIns.suspendFunctionN(1)
-                  .typeWith(scopeSimpleType, declaration.returnType)
+                pluginContext.irBuiltIns.suspendFunctionN(1).typeWith(scopeSimpleType, declaration.returnType)
                   .addAnnotations(listOf(irCall(extensionFnConstructor)))
               )
             )
@@ -216,11 +248,9 @@ private class IrVisitor(
 
   /** Finds the line and column of [irElement] within this file. */
   private fun IrFile.locationOf(irElement: IrElement?): CompilerMessageSourceLocation {
-    val sourceRangeInfo =
-      fileEntry.getSourceRangeInfo(
-        beginOffset = irElement?.startOffset ?: SYNTHETIC_OFFSET,
-        endOffset = irElement?.endOffset ?: SYNTHETIC_OFFSET
-      )
+    val sourceRangeInfo = fileEntry.getSourceRangeInfo(
+      beginOffset = irElement?.startOffset ?: SYNTHETIC_OFFSET, endOffset = irElement?.endOffset ?: SYNTHETIC_OFFSET
+    )
     return CompilerMessageLocationWithRange.create(
       path = sourceRangeInfo.filePath,
       lineStart = sourceRangeInfo.startLineNumber + 1,
@@ -260,4 +290,9 @@ private class IrVisitor(
     lambda,
     IrStatementOrigin.LAMBDA
   )
+}
+
+private inline fun <reified T> classId(): ClassId {
+  val fqName = FqName(T::class.java.canonicalName)
+  return ClassId.topLevel(fqName)
 }
