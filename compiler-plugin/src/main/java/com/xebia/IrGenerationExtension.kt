@@ -127,22 +127,7 @@ private class IrVisitor(
       return super.visitFunctionNew(declaration)
     }
 
-    declaration.annotations += listOf(
-      IrConstructorCallImpl.fromSymbolOwner(
-        jvmNameConstructor.owner.returnType,
-        jvmNameConstructor
-      ).apply {
-        putValueArgument(
-          0,
-          IrConstImpl.string(
-            UNDEFINED_OFFSET,
-            UNDEFINED_OFFSET,
-            pluginContext.irBuiltIns.stringType,
-            "${declaration.name}Suspend"
-          )
-        )
-      }
-    )
+    declaration.annotations += listOf(jvmNameAnnotation("${declaration.name}Suspend"))
 
     if (pluginContext.platform?.isJvm() == true) {
       // This declaration is only available on JVM
@@ -166,28 +151,14 @@ private class IrVisitor(
         copyParameterDeclarationsFrom(declaration)
         val `this` = this.dispatchReceiverParameter!!
 
-        annotations += listOf(
-          IrConstructorCallImpl.fromSymbolOwner(
-            jvmNameConstructor.owner.returnType,
-            jvmNameConstructor
-          ).apply {
-            putValueArgument(
-              0,
-              IrConstImpl.string(
-                UNDEFINED_OFFSET,
-                UNDEFINED_OFFSET,
-                pluginContext.irBuiltIns.stringType,
-                "${declaration.name}"
-              )
-            )
-          })
-
+        annotations += listOf(jvmNameAnnotation("${declaration.name}"))
 
         body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
           val lambda = buildSuspendLambda(declaration.returnType) {
             body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
               +irReturn(irCall(declaration).apply {
                 this.dispatchReceiver = irGet(`this`)
+
                 thisScope.typeParameters.withIndex().forEach { (index, type) ->
                   putTypeArgument(index, type.defaultType)
                 }
@@ -216,12 +187,27 @@ private class IrVisitor(
           }
 
           +irReturn(call)
-//          +irThrow(irCallConstructor(NotImplementedError.constructors.first(), emptyList()))
         }
       }
     }
     return super.visitFunctionNew(declaration)
   }
+
+  private fun jvmNameAnnotation(name: String) =
+    IrConstructorCallImpl.fromSymbolOwner(
+      jvmNameConstructor.owner.returnType,
+      jvmNameConstructor
+    ).apply {
+      putValueArgument(
+        0,
+        IrConstImpl.string(
+          UNDEFINED_OFFSET,
+          UNDEFINED_OFFSET,
+          pluginContext.irBuiltIns.stringType,
+          name
+        )
+      )
+    }
 
   private fun IrDeclaration.reportError(message: String) {
     val location = file.locationOf(this)
@@ -245,7 +231,7 @@ private class IrVisitor(
     )!!
   }
 
-  fun IrBuilderWithScope.buildSuspendLambda(
+  private fun IrBuilderWithScope.buildSuspendLambda(
     returnType: IrType,
     funApply: IrSimpleFunction.() -> Unit
   ): IrSimpleFunction = pluginContext.irFactory.buildFun {
@@ -267,7 +253,7 @@ private class IrVisitor(
     funApply()
   }
 
-  fun lambdaArgument(lambda: IrSimpleFunction, type: IrType): IrFunctionExpression = IrFunctionExpressionImpl(
+  private fun lambdaArgument(lambda: IrSimpleFunction, type: IrType): IrFunctionExpression = IrFunctionExpressionImpl(
     UNDEFINED_OFFSET,
     UNDEFINED_OFFSET,
     type,
