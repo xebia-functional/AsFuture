@@ -41,6 +41,7 @@ import org.jetbrains.kotlin.platform.jvm.isJvm
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.backend.common.descriptors.synthesizedName
 import org.jetbrains.kotlin.backend.common.lower.irThrow
+import org.jetbrains.kotlin.fir.declarations.builder.buildEnumEntry
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.builders.IrBuilderWithScope
 import org.jetbrains.kotlin.ir.builders.declarations.IrTypeParameterBuilder
@@ -51,19 +52,27 @@ import org.jetbrains.kotlin.ir.builders.irGet
 import org.jetbrains.kotlin.ir.builders.irReturn
 import org.jetbrains.kotlin.ir.builders.parent
 import org.jetbrains.kotlin.ir.declarations.IrAttributeContainer
+import org.jetbrains.kotlin.ir.declarations.IrEnumEntry
 import org.jetbrains.kotlin.ir.declarations.IrTypeParameter
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.declarations.copyAttributes
+import org.jetbrains.kotlin.ir.declarations.impl.IrEnumEntryImpl
+import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
 import org.jetbrains.kotlin.ir.expressions.IrStatementOrigin
+import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrFunctionExpressionImpl
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
+import org.jetbrains.kotlin.ir.symbols.impl.IrEnumEntrySymbolImpl
 import org.jetbrains.kotlin.ir.types.SimpleTypeNullability
 import org.jetbrains.kotlin.ir.types.SimpleTypeNullability.DEFINITELY_NOT_NULL
 import org.jetbrains.kotlin.ir.types.addAnnotations
 import org.jetbrains.kotlin.ir.types.classFqName
 import org.jetbrains.kotlin.ir.types.defaultType
 import org.jetbrains.kotlin.ir.types.typeWith
+import org.jetbrains.kotlin.ir.util.irCall
+import org.jetbrains.kotlin.ir.util.irConstructorCall
 import org.jetbrains.kotlin.ir.util.patchDeclarationParents
 
 internal class IrGenerationExtension(
@@ -93,6 +102,10 @@ private class IrVisitor(
     pluginContext.referenceClass(ClassId.fromString("kotlin/ExtensionFunctionType"))?.constructors?.firstOrNull()
       ?: error("Internal error: Class ExtensionFunctionType not found.")
 
+  val jvmNameConstructor: IrConstructorSymbol =
+    pluginContext.referenceClass(ClassId.fromString("kotlin/jvm/JvmName"))?.constructors?.firstOrNull()
+      ?: error("Internal error: Class ExtensionFunctionType not found.")
+
   val scopeSimpleType = IrSimpleTypeImpl(
     coroutineScopeType,
     DEFINITELY_NOT_NULL,
@@ -114,6 +127,23 @@ private class IrVisitor(
       return super.visitFunctionNew(declaration)
     }
 
+    declaration.annotations += listOf(
+      IrConstructorCallImpl.fromSymbolOwner(
+        jvmNameConstructor.owner.returnType,
+        jvmNameConstructor
+      ).apply {
+        putValueArgument(
+          0,
+          IrConstImpl.string(
+            UNDEFINED_OFFSET,
+            UNDEFINED_OFFSET,
+            pluginContext.irBuiltIns.stringType,
+            "${declaration.name}Suspend"
+          )
+        )
+      }
+    )
+
     if (pluginContext.platform?.isJvm() == true) {
       // This declaration is only available on JVM
       val futureFn: IrSimpleFunctionSymbol = pluginContext.referenceFunctions(futureCallableId).singleOrNull()
@@ -129,15 +159,29 @@ private class IrVisitor(
         emptyList()
       )
 
-      val NotImplementedError: IrClassSymbol =
-        pluginContext.referenceClass(ClassId.fromString("kotlin.NotImplementedError")) ?: error("Cannot find TODO")
-
       parent.addFunction("${declaration.name}Future", futureSimpleType.type).apply {
         val thisScope = this
         origin = AsFutureOrigin
         copyAttributes(declaration as IrAttributeContainer)
         copyParameterDeclarationsFrom(declaration)
         val `this` = this.dispatchReceiverParameter!!
+
+        annotations += listOf(
+          IrConstructorCallImpl.fromSymbolOwner(
+            jvmNameConstructor.owner.returnType,
+            jvmNameConstructor
+          ).apply {
+            putValueArgument(
+              0,
+              IrConstImpl.string(
+                UNDEFINED_OFFSET,
+                UNDEFINED_OFFSET,
+                pluginContext.irBuiltIns.stringType,
+                "${declaration.name}"
+              )
+            )
+          })
+
 
         body = DeclarationIrBuilder(pluginContext, symbol).irBlockBody {
           val lambda = buildSuspendLambda(declaration.returnType) {
