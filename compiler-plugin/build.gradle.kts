@@ -1,18 +1,9 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-  kotlin("jvm") version ("1.8.22")
-  kotlin("kapt") version ("1.8.22")
-}
-
-allprojects {
-  repositories {
-    mavenLocal()
-    mavenCentral()
-    maven("https://maven.google.com")
-    maven("https://plugins.gradle.org/m2/")
-    google()
-  }
+  kotlin("jvm")
+  kotlin("kapt")
+  id("io.arrow-kt.arrow-gradle-config-publish") version "0.12.0-rc.3"
 }
 
 group = "com.xebia"
@@ -62,13 +53,10 @@ tasks.withType<KotlinCompile> {
   kotlinOptions.jvmTarget = "1.8"
 }
 
-//./gradlew clean :lib:compileKotlinJvm --no-daemon -Dorg.gradle.debug=true -Dkotlin.compiler.execution.strategy="in-process" -Dkotlin.daemon.jvm.options="-Xdebug,-Xrunjdwp:transport=dt_socket,address=5005,server=y,suspend=n"
-
 tasks.create<JavaExec>("generateTests") {
   classpath = sourceSets.test.get().runtimeClasspath
   mainClass.set("com.xebia.GenerateKotlinCompilerTestKt")
 }
-
 
 tasks.test {
   testLogging { showStandardStreams = true }
@@ -88,9 +76,6 @@ tasks.test {
 }
 
 fun Test.setLibraryProperty(propName: String, jarName: String) {
-//error(project.configurations.testRuntimeClasspath
-//  .get()
-//  .files.joinToString("\n") { it.absolutePath })
   val path =
     project.configurations.testRuntimeClasspath
       .get()

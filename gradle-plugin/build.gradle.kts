@@ -1,7 +1,8 @@
 plugins {
-  kotlin("jvm") version ("1.8.20")
-  kotlin("kapt") version ("1.8.20")
-  id("java-gradle-plugin")
+  kotlin("jvm") version "1.8.22"
+  kotlin("kapt") version "1.8.22"
+  `java-gradle-plugin`
+  id("io.arrow-kt.arrow-gradle-config-publish") version "0.12.0-rc.3"
 }
 
 group = "com.xebia"
@@ -9,13 +10,12 @@ version = "1.0.0"
 
 allprojects {
   repositories {
-    mavenLocal()
     mavenCentral()
     maven("https://maven.google.com")
     maven("https://plugins.gradle.org/m2/")
-    google()
   }
 }
+
 dependencies {
   implementation("org.jetbrains.kotlin:kotlin-gradle-plugin-api:1.8.22")
 }
