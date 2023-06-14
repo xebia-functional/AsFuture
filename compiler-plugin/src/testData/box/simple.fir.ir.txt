@@ -1,0 +1,67 @@
+FILE fqName:com.xebia.test fileName:/simple.kt
+  CLASS CLASS name:Example modality:FINAL visibility:public superTypes:[kotlinx.coroutines.CoroutineScope]
+    $this: VALUE_PARAMETER INSTANCE_RECEIVER name:<this> type:com.xebia.test.Example
+    CONSTRUCTOR visibility:public <> (coroutineContext:kotlin.coroutines.CoroutineContext) returnType:com.xebia.test.Example [primary]
+      VALUE_PARAMETER name:coroutineContext index:0 type:kotlin.coroutines.CoroutineContext
+      BLOCK_BODY
+        DELEGATING_CONSTRUCTOR_CALL 'public constructor <init> () [primary] declared in kotlin.Any'
+        INSTANCE_INITIALIZER_CALL classDescriptor='CLASS CLASS name:Example modality:FINAL visibility:public superTypes:[kotlinx.coroutines.CoroutineScope]'
+    PROPERTY name:coroutineContext visibility:public modality:OPEN [val]
+      overridden:
+        public abstract coroutineContext: kotlin.coroutines.CoroutineContext [val]
+      FIELD PROPERTY_BACKING_FIELD name:coroutineContext type:kotlin.coroutines.CoroutineContext visibility:private [final]
+        EXPRESSION_BODY
+          GET_VAR 'coroutineContext: kotlin.coroutines.CoroutineContext declared in com.xebia.test.Example.<init>' type=kotlin.coroutines.CoroutineContext origin=INITIALIZE_PROPERTY_FROM_PARAMETER
+      FUN DEFAULT_PROPERTY_ACCESSOR name:<get-coroutineContext> visibility:public modality:OPEN <> ($this:com.xebia.test.Example) returnType:kotlin.coroutines.CoroutineContext
+        correspondingProperty: PROPERTY name:coroutineContext visibility:public modality:OPEN [val]
+        overridden:
+          public abstract fun <get-coroutineContext> (): kotlin.coroutines.CoroutineContext declared in kotlinx.coroutines.CoroutineScope
+        $this: VALUE_PARAMETER name:<this> type:com.xebia.test.Example
+        BLOCK_BODY
+          RETURN type=kotlin.Nothing from='public open fun <get-coroutineContext> (): kotlin.coroutines.CoroutineContext declared in com.xebia.test.Example'
+            GET_FIELD 'FIELD PROPERTY_BACKING_FIELD name:coroutineContext type:kotlin.coroutines.CoroutineContext visibility:private [final]' type=kotlin.coroutines.CoroutineContext origin=null
+              receiver: GET_VAR '<this>: com.xebia.test.Example declared in com.xebia.test.Example.<get-coroutineContext>' type=com.xebia.test.Example origin=null
+    FUN name:myFunction visibility:public modality:FINAL <> ($this:com.xebia.test.Example) returnType:kotlin.Int [suspend]
+      annotations:
+        AsFuture
+        JvmName(name = 'myFunctionSuspend')
+      $this: VALUE_PARAMETER name:<this> type:com.xebia.test.Example
+      BLOCK_BODY
+        CALL 'public final fun delay (timeMillis: kotlin.Long): kotlin.Unit [suspend] declared in kotlinx.coroutines.DelayKt' type=kotlin.Unit origin=null
+          timeMillis: CONST Long type=kotlin.Long value=1000
+        RETURN type=kotlin.Nothing from='public final fun myFunction (): kotlin.Int [suspend] declared in com.xebia.test.Example'
+          CONST Int type=kotlin.Int value=1
+    FUN FAKE_OVERRIDE name:equals visibility:public modality:OPEN <> ($this:kotlin.Any, other:kotlin.Any?) returnType:kotlin.Boolean [fake_override,operator]
+      overridden:
+        public open fun equals (other: kotlin.Any?): kotlin.Boolean [fake_override,operator] declared in kotlinx.coroutines.CoroutineScope
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+      VALUE_PARAMETER name:other index:0 type:kotlin.Any?
+    FUN FAKE_OVERRIDE name:hashCode visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.Int [fake_override]
+      overridden:
+        public open fun hashCode (): kotlin.Int [fake_override] declared in kotlinx.coroutines.CoroutineScope
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+    FUN FAKE_OVERRIDE name:toString visibility:public modality:OPEN <> ($this:kotlin.Any) returnType:kotlin.String [fake_override]
+      overridden:
+        public open fun toString (): kotlin.String [fake_override] declared in kotlinx.coroutines.CoroutineScope
+      $this: VALUE_PARAMETER name:<this> type:kotlin.Any
+    FUN GENERATED_AS_FUTURE_CLASS_MEMBER name:myFunctionFuture visibility:public modality:FINAL <> ($this:com.xebia.test.Example) returnType:java.util.concurrent.CompletableFuture<kotlin.Int>
+      annotations:
+        JvmName(name = 'myFunction')
+        Deprecated(message = 'This function should not be called from Kotlin sources, only Java APIs.', replaceWith = <null>, level = GET_ENUM 'ENUM_ENTRY IR_EXTERNAL_DECLARATION_STUB name:HIDDEN' type=kotlin.DeprecationLevel)
+      $this: VALUE_PARAMETER name:<this> type:com.xebia.test.Example
+      BLOCK_BODY
+        RETURN type=kotlin.Nothing from='public final fun myFunctionFuture (): java.util.concurrent.CompletableFuture<kotlin.Int> declared in com.xebia.test.Example'
+          CALL 'public final fun future <T> (context: kotlin.coroutines.CoroutineContext, start: kotlinx.coroutines.CoroutineStart, block: @[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, T of kotlinx.coroutines.future.FutureKt.future>): java.util.concurrent.CompletableFuture<T of kotlinx.coroutines.future.FutureKt.future> declared in kotlinx.coroutines.future.FutureKt' type=java.util.concurrent.CompletableFuture<kotlin.Int> origin=null
+            <T>: kotlin.Int
+            $receiver: GET_VAR '<this>: com.xebia.test.Example declared in com.xebia.test.Example.myFunctionFuture' type=com.xebia.test.Example origin=null
+            block: FUN_EXPR type=@[ExtensionFunctionType] kotlin.coroutines.SuspendFunction1<kotlinx.coroutines.CoroutineScope, kotlin.Int> origin=LAMBDA
+              FUN LOCAL_FUNCTION_FOR_LAMBDA name:<anonymous> visibility:public modality:FINAL <> ($receiver:kotlinx.coroutines.CoroutineScope) returnType:kotlin.Int [suspend]
+                $receiver: VALUE_PARAMETER name:$this$future type:kotlinx.coroutines.CoroutineScope
+                BLOCK_BODY
+                  RETURN type=kotlin.Nothing from='public final fun <anonymous> (): kotlin.Int [suspend] declared in com.xebia.test.Example.myFunctionFuture'
+                    CALL 'public final fun myFunction (): kotlin.Int [suspend] declared in com.xebia.test.Example' type=kotlin.Int origin=null
+                      $this: GET_VAR '<this>: com.xebia.test.Example declared in com.xebia.test.Example.myFunctionFuture' type=com.xebia.test.Example origin=null
+  FUN name:box visibility:public modality:FINAL <> () returnType:kotlin.String
+    BLOCK_BODY
+      RETURN type=kotlin.Nothing from='public final fun box (): kotlin.String declared in com.xebia.test'
+        CONST String type=kotlin.String value="OK"
