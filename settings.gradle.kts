@@ -7,4 +7,3 @@ includeBuild("compiler-plugin")
 
 include(":annotation")
 include(":lib")
-include(":example")
