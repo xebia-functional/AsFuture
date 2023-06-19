@@ -1,0 +1,54 @@
+name: Publish final version
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+env:
+  OSS_USER: '${{ secrets.OSS_USER }}'
+  OSS_TOKEN: '${{ secrets.OSS_TOKEN }}'
+  OSS_STAGING_PROFILE_ID: '${{ secrets.OSS_STAGING_PROFILE_ID }}'
+  SIGNING_KEY_PASSPHRASE: '${{ secrets.SIGNING_KEY_PASSPHRASE }}'
+  SIGNING_KEY: '${{ secrets.SIGNING_KEY }}'
+  GRADLE_PUBLISH_KEY: '${{ secrets.GRADLE_PUBLISH_KEY }}'
+  GRADLE_PUBLISH_SECRET: '${{ secrets.GRADLE_PUBLISH_SECRET }}'
+
+jobs:
+  publish:
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 11
+
+      - name: Build
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: build
+
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: 'reports-${{ matrix.os }}'
+          path: '**/build/reports/**'
+
+      - name: Publish final version
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: publishToSonatype closeSonatypeStagingRepository
+
+      - name: Publish to Gradle Plugin Portal
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: publishPlugins -P"gradle.publish.key"="${{ secrets.GRADLE_PUBLISH_KEY }}" -P"gradle.publish.secret"="${{ secrets.GRADLE_PUBLISH_SECRET }}"
