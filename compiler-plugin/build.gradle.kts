@@ -32,7 +32,7 @@ dependencies {
   testCompileOnly("org.jetbrains.kotlin:kotlin-compiler:1.8.22")
   testImplementation("org.jetbrains.kotlin:kotlin-compiler:1.8.22")
   testImplementation("org.jetbrains.kotlin:kotlin-compiler-internal-test-framework:1.8.22")
-  testImplementation(platform("org.junit:junit-bom:5.9.1"))
+  testImplementation(platform("org.junit:junit-bom:5.9.3"))
   testImplementation("org.junit.jupiter:junit-jupiter")
   testImplementation("org.junit.platform:junit-platform-commons")
   testImplementation("org.junit.platform:junit-platform-launcher")
