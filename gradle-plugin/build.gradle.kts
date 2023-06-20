@@ -28,3 +28,7 @@ gradlePlugin {
     }
   }
 }
+
+tasks.withType<AbstractPublishToMaven> {
+  dependsOn(tasks.withType<Sign>())
+}

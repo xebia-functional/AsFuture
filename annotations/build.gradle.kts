@@ -12,3 +12,6 @@ kotlin {
     js { nodejs() }
 }
 
+tasks.withType<AbstractPublishToMaven> {
+    dependsOn(tasks.withType<Sign>())
+}

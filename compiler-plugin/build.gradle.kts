@@ -88,3 +88,7 @@ fun Test.setLibraryProperty(propName: String, jarName: String) {
       ?: return
   systemProperty(propName, path)
 }
+
+tasks.withType<AbstractPublishToMaven> {
+  dependsOn(tasks.withType<Sign>())
+}
