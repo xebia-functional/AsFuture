@@ -13,12 +13,12 @@ class PluginAnnotationsConfigurator(testServices: TestServices) :
   EnvironmentConfigurator(testServices) {
 
   companion object {
-    private const val ANNOTATIONS_JAR_DIR = "../annotation/build/libs/"
+    private const val ANNOTATIONS_JAR_DIR = "../annotations/build/libs/"
     private val ANNOTATIONS_JAR_FILTER = FilenameFilter { _, name ->
-      name.startsWith("annotation-jvm") && name.endsWith(".jar")
+      name.startsWith("annotations-jvm") && name.endsWith(".jar")
     }
     private val failMessage = {
-      "Jar with annotations does not exist. Please run :annotation:jar"
+      "Jar with annotations does not exist. Please run :annotations:jar"
     }
     fun jar(testServices: TestServices) =
       File(ANNOTATIONS_JAR_DIR).listFiles(ANNOTATIONS_JAR_FILTER)?.firstOrNull()
