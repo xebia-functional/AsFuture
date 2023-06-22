@@ -23,7 +23,7 @@ dependencies {
   compileOnly("org.jetbrains.kotlin:kotlin-compiler-embeddable:1.8.22")
   testImplementation("dev.zacsweers.kctfork:core:0.2.1")
   testImplementation("junit:junit:4.13.2")
-  testImplementation("com.google.truth:truth:1.1.3")
+  testImplementation("com.google.truth:truth:1.1.5")
   testImplementation(kotlin("reflect"))
   testRuntimeOnly("org.jetbrains.kotlin:kotlin-test:1.8.22")
   testRuntimeOnly("org.jetbrains.kotlin:kotlin-script-runtime:1.8.22")
