@@ -1,5 +1,5 @@
 plugins {
-    id("org.jetbrains.kotlin.multiplatform") version "1.8.20"
+    id("org.jetbrains.kotlin.multiplatform") version "1.8.22"
     id("io.arrow-kt.arrow-gradle-config-publish") version "0.12.0-rc.3"
 }
 
