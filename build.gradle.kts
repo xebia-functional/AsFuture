@@ -5,7 +5,7 @@ buildscript {
 }
 
 plugins {
-  id("org.jetbrains.kotlin.multiplatform") version "1.8.20" apply false
+  id("org.jetbrains.kotlin.multiplatform") version "1.8.22" apply false
   id("io.arrow-kt.arrow-gradle-config-nexus") version "0.12.0-rc.3"
 }
 
