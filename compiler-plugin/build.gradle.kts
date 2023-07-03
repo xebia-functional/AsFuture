@@ -38,7 +38,7 @@ dependencies {
   testImplementation("org.junit.platform:junit-platform-launcher")
   testImplementation("org.junit.platform:junit-platform-runner")
   testImplementation("org.junit.platform:junit-platform-suite-api")
-  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.2")
 }
 
 java {
