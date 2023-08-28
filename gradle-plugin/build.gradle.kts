@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "1.8.22"
+    kotlin("jvm") version "1.9.10"
     kotlin("kapt") version "1.8.22"
     `java-gradle-plugin`
     id("io.arrow-kt.arrow-gradle-config-publish") version "0.12.0-rc.3"
